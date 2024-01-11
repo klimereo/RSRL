@@ -1,6 +1,27 @@
 import itertools
 
-class rsrl_sigma:
+# The following two functions are used to traverse association sets
+def get_output_unary(input_element, association_set):
+    matching_tuple = next((tuple_element for tuple_element in association_set if input_element == tuple_element[0]),
+                          None)
+    if matching_tuple is not None:
+        return matching_tuple[1]
+    else:
+        return None
+
+
+def get_output_binary(input1, input2, association_set):
+    matching_tuple = next(
+        ((tuple_element[0][0], tuple_element[0][1], tuple_element[1]) for tuple_element in association_set if
+         (input1, input2) == tuple_element[0]), None)
+
+    if matching_tuple is not None:
+        return matching_tuple[2]
+    else:
+        return None
+
+
+class rsrl_signatures:
     def check_partial_order(self, sorts, p_order):
         transitive = self.check_transitive(p_order)
         antisymmetric = self.check_antisymmetric(p_order)
@@ -72,7 +93,7 @@ class rsrl_sigma:
         for s1 in S:
             for s2 in S:
                 for alpha in A:
-                    paths.add((((s1,s2), alpha)))
+                    paths.add((((s1, s2), alpha)))
         return paths
 
     def check_F(self, S, p_order, A, F):
@@ -84,7 +105,7 @@ class rsrl_sigma:
                     s2_tuple = (s2, alpha)
                     for input, output in F:
                         for order in p_order:
-                            if s1_tuple == input and (s1,s2) == order:
+                            if s1_tuple == input and (s1, s2) == order:
                                 s1_val = output
                                 valid_features.append(((s1_tuple), s1_val))
                                 for x, y in p_order:
@@ -95,10 +116,9 @@ class rsrl_sigma:
                             else:
                                 continue
 
-
         if F == set(valid_features):
             print("Success: Appropriateness function is well-defined.")
-            return set(valid_features)
+            return True
         else:
             print("Error: Appropriateness function is ill-defined.")
 
@@ -109,7 +129,7 @@ class rsrl_sigma:
         return True, print('Success: Relations and their arities are well-defined.')
 
 
-class rsrl_descs:
+class rsrl_descriptions:
     def generate_terms(self, V, A, max_len):
         # Here max len is needed as the definition of terms is infinitely recursive
         terms = []
@@ -127,7 +147,6 @@ class rsrl_descs:
                     continue
 
         return terms
-
 
     def generate_formulae(self, S, T, R, Ar, V):
         formulae = []
@@ -149,4 +168,65 @@ class rsrl_descs:
         return formulae
 
 
+class rsrl_interpretations:
 
+    def is_valid_interpretation(self, signature, interpretation):
+        A_sigma = signature[2]
+        F_sigma = signature[3]
+        Smax_sigma = signature[4]
+        U = interpretation[0]
+        Smax_ass = interpretation[1]
+        A_int = interpretation[2]
+
+        sort_assignment = self.check_sort_assignment(U, Smax_sigma, Smax_ass)
+        attr_paths = self.check_attribute_paths(A_sigma, A_int, U, Smax_ass, F_sigma)
+
+        if sort_assignment is not True:
+            return False, print("Error: Interpretation is invalid. Sort assignment seems to be the issue.")
+        elif attr_paths is not True:
+            return False, print("Error: Interpretation is invalid. Attribute assignment seems to be the issue.")
+        else:
+            return True, print ("Success: Interpretation is valid.")
+
+    def check_sort_assignment(self, U, S_max_sigma, Smax_ass):
+        sorted_entities = []
+        sorts_of_entities = []
+
+        for entity, sort in Smax_ass:
+            sorted_entities.append(entity)
+            sorts_of_entities.append(sort)
+
+        if (set(sorted_entities) == U) and (set(sorts_of_entities).issubset(S_max_sigma)):
+            return True
+        else:
+            return False
+
+    def check_attribute_paths(self, A_sigma, A_int, U, Smax_ass, F_sigma):
+        # The presence of condition paths is to be checked in F_sigma
+        tests = []
+        for alpha in A_sigma:
+            for u1 in U:
+                if ((not(get_output_binary(u1, alpha, A_int)) or
+                    get_output_binary(get_output_unary(u1, Smax_ass), alpha, F_sigma)) and
+                        get_output_binary(get_output_unary(u1, Smax_ass), alpha, F_sigma) ==
+                        get_output_unary(get_output_binary(u1, alpha, A_int), Smax_ass)):
+                    tests.append(True)
+                else:
+                    tests.append(False)
+                    continue
+
+        for alpha in A_sigma:
+            for u in U:
+                if (not(get_output_binary(get_output_unary(u, Smax_ass), alpha, F_sigma)) or
+                       get_output_binary(u, alpha, A_int)):
+                    tests.append(True)
+                else:
+                    tests.append(False)
+                    continue
+
+        if True in set(tests):
+            return True
+        elif False in set(tests):
+            return False
+        else:
+            print("Attribute assignment check could not be verified for some reason.")
